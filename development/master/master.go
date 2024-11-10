@@ -289,7 +289,7 @@ func (master *Master) handleService() {
 	http.HandleFunc("/recommendation", master.serviceRecommendation)
 	serviceAdress := syncutils.JoinAddress(master.ip, syncutils.ServicePort)
 	log.Printf("INFO: %s: Service running on %s", handleServicePrefix, serviceAdress)
-	defer log.Printf("INFO: %s: Service stopped.")
+	defer log.Printf("INFO: %s: Service stopped", handleServicePrefix)
 
 	if err := http.ListenAndServe(serviceAdress, nil); err != nil {
 		log.Printf("ERROR: %s: Server initialization error: %v\n", handleServicePrefix, err)
@@ -352,7 +352,7 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 	defer log.Printf("INFO: %s: Recommendation handled\n", handleRecommendationPrefix)
 
 	var request syncutils.ClientRecRequest
-	err := receiveRecommendationRequest(apiResponse, apiRequest, request)
+	err := receiveRecommendationRequest(apiResponse, apiRequest, &request)
 	if err != nil {
 		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
 		return
@@ -364,7 +364,7 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
 		return
 	}
-	err = respondRecommendationRequest(apiResponse, response)
+	err = respondRecommendationRequest(apiResponse, &response)
 	if err != nil {
 		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
 		return
@@ -373,8 +373,8 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 
 const receiveRecommendationRequestPrefix = "receiveRecRequest"
 
-func receiveRecommendationRequest(apiResponse *http.ResponseWriter, apiRequest *http.Request, request syncutils.ClientRecRequest) error {
-	err := json.NewDecoder(apiRequest.Body).Decode(&request)
+func receiveRecommendationRequest(apiResponse *http.ResponseWriter, apiRequest *http.Request, request *syncutils.ClientRecRequest) error {
+	err := json.NewDecoder(apiRequest.Body).Decode(request)
 	if err != nil {
 		http.Error(*apiResponse, "Invalid request payload", http.StatusBadRequest)
 		return fmt.Errorf("%s: Error decoding request: %v", receiveRecommendationRequestPrefix, err)
@@ -423,7 +423,7 @@ func (master *Master) processRecommendationRequest(apiResponse *http.ResponseWri
 
 const respondRecommendationRequestPrefix = "respondRecRequest"
 
-func respondRecommendationRequest(apiResponse *http.ResponseWriter, response syncutils.MasterRecResponse) error {
+func respondRecommendationRequest(apiResponse *http.ResponseWriter, response *syncutils.MasterRecResponse) error {
 	bytes, err := json.MarshalIndent(response, "", "    ")
 	if err != nil {
 		http.Error(*apiResponse, "Error marshalling response", http.StatusInternalServerError)
@@ -465,7 +465,7 @@ const handleModelRecommendationPrefix = "handleModelRec"
 
 func (master *Master) handleModelRecommendation(predictions *[]syncutils.Prediction, sum, max, min *float64, count *int, request *syncutils.ClientRecRequest) error {
 	log.Printf("INFO: %s: Handling model recommendation", handleModelRecommendationPrefix)
-	defer log.Println("INFO: %s: Model recommendation handled", handleModelRecommendationPrefix)
+	defer log.Printf("INFO: %s: Model recommendation handled", handleModelRecommendationPrefix)
 
 	beginStatus := master.slavesInfo.ReadStatus()
 	log.Printf("INFO: %s: Slaves status: %v", handleModelRecommendationPrefix, beginStatus)
@@ -643,14 +643,6 @@ func (master *Master) createBatches(nBatches, userId int, quantity int, genreIds
 		startMovieId = endMovieId
 	}
 	return batches
-}
-
-func sendRecommendationResponse(conn *net.Conn, response *syncutils.MasterRecResponse) error {
-	err := syncutils.SendObjectAsJsonMessage(response, conn)
-	if err != nil {
-		return fmt.Errorf("sendRecResponseErr: Error sending response object as json: %v", err)
-	}
-	return nil
 }
 
 func initializeUserFactors(numFeatures int) []float64 {
