@@ -242,21 +242,21 @@ func (master *Master) loadConfig(filename string) error {
 	master.movieGenreNames = config.MovieGenreNames
 	master.movieGenreIds = config.MovieGenreIds
 	master.modelConfig = config.ModelConfig
-
-	log.Println("Master config loaded")
-	log.Println("Slaves:", master.slaveIps)
-	log.Println("Movies:", len(master.movieTitles))
-	log.Println("Genres:", len(master.movieGenreNames))
-	log.Println("MovieGenreIds:", len(master.movieGenreIds))
-	log.Println("-ModelConfig-")
-	log.Println("NumFeatures:", master.modelConfig.NumFeatures)
-	log.Println("Epochs:", master.modelConfig.Epochs)
-	log.Println("LearningRate:", master.modelConfig.LearningRate)
-	log.Println("Regularization:", master.modelConfig.Regularization)
-	log.Println("R:", len(master.modelConfig.R), "x", len(master.modelConfig.R[0]))
-	log.Println("P:", len(master.modelConfig.P), "x", len(master.modelConfig.P[0]))
-	log.Println("Q:", len(master.modelConfig.Q), "x", len(master.modelConfig.Q[0]))
-
+	/*
+	   log.Println("Slaves:", master.slaveIps)
+	   log.Println("Movies:", len(master.movieTitles))
+	   log.Println("Genres:", len(master.movieGenreNames))
+	   log.Println("MovieGenreIds:", len(master.movieGenreIds))
+	   log.Println("-ModelConfig-")
+	   log.Println("NumFeatures:", master.modelConfig.NumFeatures)
+	   log.Println("Epochs:", master.modelConfig.Epochs)
+	   log.Println("LearningRate:", master.modelConfig.LearningRate)
+	   log.Println("Regularization:", master.modelConfig.Regularization)
+	   log.Println("R:", len(master.modelConfig.R), "x", len(master.modelConfig.R[0]))
+	   log.Println("P:", len(master.modelConfig.P), "x", len(master.modelConfig.P[0]))
+	   log.Println("Q:", len(master.modelConfig.Q), "x", len(master.modelConfig.Q[0]))
+	*/
+	log.Println("INFO: Config loaded")
 	return nil
 }
 

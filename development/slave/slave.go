@@ -79,7 +79,6 @@ func (slave *Slave) handleSyncRequest(conn *net.Conn) error {
 	if err != nil {
 		return fmt.Errorf("%s: Error handling request: %v", handleSyncRequestPrefix, err)
 	}
-
 	//log.Println("test: ", slave.model.Predict(1, 1))
 	err = repondSyncRequest(conn)
 	if err != nil {
@@ -102,29 +101,30 @@ func (slave *Slave) processSyncRequest(syncRequest *syncutils.MasterSyncRequest)
 	slave.movieGenreIds = syncRequest.MovieGenreIds
 	slave.model = model.LoadModel(&syncRequest.ModelConfig)
 
-	log.Println("IP: ", slave.ip)
-	log.Println("Master IP: ", slave.masterIp)
-	log.Println("Model Syncronized")
-	if len(syncRequest.MovieGenreIds) > 0 {
-		log.Println("Movie genres loaded: ", len(syncRequest.MovieGenreIds))
-	} else {
-		log.Println("No movie genres loaded")
-	}
-	if len(slave.model.R) > 0 {
-		log.Println("R: ", len(slave.model.R), ", ", len(slave.model.R[0]))
-	} else {
-		log.Println("R: ", len(slave.model.R), ", ", 0)
-	}
-	if len(slave.model.P) > 0 {
-		log.Println("P: ", len(slave.model.P), ", ", len(slave.model.P[0]))
-	} else {
-		log.Println("P: ", len(slave.model.P), ", ", 0)
-	}
-	if len(slave.model.Q) > 0 {
-		log.Println("Q: ", len(slave.model.Q), ", ", len(slave.model.Q[0]))
-	} else {
-		log.Println("Q: ", len(slave.model.Q), ", ", 0)
-	}
+	log.Println("INFO: Master IP ", slave.masterIp)
+	/*
+		log.Println("Model Syncronized")
+		if len(syncRequest.MovieGenreIds) > 0 {
+			log.Println("Movie genres loaded: ", len(syncRequest.MovieGenreIds))
+		} else {
+			log.Println("No movie genres loaded")
+		}
+		if len(slave.model.R) > 0 {
+			log.Println("R: ", len(slave.model.R), ", ", len(slave.model.R[0]))
+		} else {
+			log.Println("R: ", len(slave.model.R), ", ", 0)
+		}
+		if len(slave.model.P) > 0 {
+			log.Println("P: ", len(slave.model.P), ", ", len(slave.model.P[0]))
+		} else {
+			log.Println("P: ", len(slave.model.P), ", ", 0)
+		}
+		if len(slave.model.Q) > 0 {
+			log.Println("Q: ", len(slave.model.Q), ", ", len(slave.model.Q[0]))
+		} else {
+			log.Println("Q: ", len(slave.model.Q), ", ", 0)
+		}
+	*/
 	return nil
 }
 
