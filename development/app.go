@@ -112,7 +112,8 @@ func genresHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
-	genres := getMoviesGenres()
+	genres := Genres{}
+	LoadGenres(&genres)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(genres)
 }
@@ -194,9 +195,10 @@ func sendRequestToRecommendationHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Error al decodificar el cuerpo de la petición", http.StatusBadRequest)
 		return
 	}
-
+	moviesTitles := MoviesTitles{}
+	LoadMoviesTitles(&moviesTitles)
 	clientRecRequest := createClientRecRequest(clientToSend.UserId, clientToSend.Quantity, clientToSend.GenreIds)
-	clientRecRequest.Ratings = MappRatingsClient(clientToSend.MoviesRatings, &MoviesTitles{})
+	clientRecRequest.Ratings = MappRatingsClient(clientToSend.MoviesRatings, &moviesTitles)
 
 	sendRequestToRecommendationService(clientRecRequest)
 
