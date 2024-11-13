@@ -29,9 +29,10 @@ type SlaveSyncResponse struct {
 
 // Recommendation Communication
 type ClientRecRequest struct {
-	UserId   int   `json:"userId"`
-	Quantity int   `json:"quantity"`
-	GenreIds []int `json:"genreIds"`
+	UserId   int       `json:"userId"`
+	Ratings  []float64 `json:"ratings"`
+	Quantity int       `json:"quantity"`
+	GenreIds []int     `json:"genreIds"`
 }
 
 type MasterRecRequest struct {

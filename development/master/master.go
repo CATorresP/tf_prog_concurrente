@@ -390,6 +390,12 @@ func (master *Master) processRecommendationRequest(apiResponse *http.ResponseWri
 	var max float64
 	var min float64
 	var count int
+
+	if len(request.Ratings) != len(master.modelConfig.Q) {
+		http.Error(*apiResponse, "Invalid request payload", http.StatusBadRequest)
+		return fmt.Errorf("%s: Incorrect ratings quantity", processRecommendationRequestPrefix)
+	}
+
 	err := master.handleModelRecommendation(&predictions, &sum, &max, &min, &count, request)
 	if err != nil {
 		http.Error(*apiResponse, "Internal server error", http.StatusInternalServerError)
@@ -489,7 +495,7 @@ func (master *Master) handleModelRecommendation(predictions *[]syncutils.Predict
 		UserFactors: initializeUserFactors(master.modelConfig.NumFeatures),
 	}
 
-	batches := master.createBatches(nBatches, request.UserId, request.Quantity, request.GenreIds, masterUserFactors.UserFactors)
+	batches := master.createBatches(nBatches, request.UserId, request.Ratings, request.Quantity, request.GenreIds, masterUserFactors.UserFactors)
 
 	activeSlaveIds := master.slavesInfo.GetActiveIdsByStatus(true)
 
@@ -622,7 +628,7 @@ func (master *Master) handlePartialRecommendation(conn *net.Conn, cond *sync.Con
 	return nil
 }
 
-func (master *Master) createBatches(nBatches, userId int, quantity int, genreIds []int, userFactors []float64) []syncutils.MasterRecRequest {
+func (master *Master) createBatches(nBatches, userId int, ratings []float64, quantity int, genreIds []int, userFactors []float64) []syncutils.MasterRecRequest {
 	batches := make([]syncutils.MasterRecRequest, nBatches)
 	var rangeSize int = len(master.movieTitles) / nBatches
 	var startMovieId int = 0
@@ -633,7 +639,7 @@ func (master *Master) createBatches(nBatches, userId int, quantity int, genreIds
 		}
 		batches[i] = syncutils.MasterRecRequest{
 			UserId:       userId,
-			UserRatings:  master.modelConfig.R[userId][startMovieId:endMovieId],
+			UserRatings:  ratings[startMovieId:endMovieId],
 			StartMovieId: startMovieId,
 			EndMovieId:   endMovieId,
 			Quantity:     quantity,
