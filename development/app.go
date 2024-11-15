@@ -65,23 +65,7 @@ func MappperMovieGenres(idTitle int, moviesTitles *MoviesTitles, moviesGenreIds 
 	return movieGenres
 }
 
-func Banner() {
-	fmt.Println("  ____                 _                            _             _   _             ")
-	fmt.Println(" |  _ \\ ___  __ _  ___| |_ ___  _ __ ___   ___  __| | __ _ _ __ | |_(_) ___  _ __  ")
-	fmt.Println(" | |_) / _ \\/ _` |/ __| __/ _ \\| '_ ` _ \\ / _ \\/ _` |/ _` | '_ \\| __| |/ _ \\| '_ \\ ")
-	fmt.Println(" |  _ <  __/ (_| | (__| || (_) | | | | | |  __/ (_| | (_| | | | | |_| | (_) | | | |")
-	fmt.Println(" |_| \\_\\___|\\__,_|\\___|\\__\\___/|_| |_| |_|\\___|\\__,_|\\__,_|_| |_|\\__|_|\\___/|_| |_|")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println(" __          __  _                            _          __  __                                    ")
-	fmt.Println(" \\ \\        / / | |                          | |        |  \\/  |                                   ")
-	fmt.Println("  \\ \\  /\\  / /__| | ___ ___  _ __ ___   ___  | |_ ___   | \\  / | __ _ _ __   __ _  __ _  ___ _ __  ")
-	fmt.Println("   \\ \\/  \\/ / _ \\ |/ __/ _ \\| '_ ` _ \\ / _ \\ | __/ _ \\  | |\\/| |/ _` | '_ \\ / _` |/ _` |/ _ \\ '__| ")
-	fmt.Println("    \\  /\\  /  __/ | (_| (_) | | | | | |  __/ | || (_) | | |  | | (_| | | | | (_| | (_| |  __/ |    ")
-	fmt.Println("     \\/  \\/ \\___|_|\\___\\___/|_| |_| |_|\\___|  \\__\\___/  |_|  |_|\\__,_|_| |_|\\__,_|\\__, |\\___|_|    ")
-	fmt.Println("                                                                                     __/ |         ")
-	fmt.Println("                                                                                    |___/          ")
-	fmt.Println("--------------------------------------------------------------------------------")
-}
+
 
 func createClientRecRequest(userId int, quantity int, genreIds []int) ClientRecRequest {
 	return ClientRecRequest{
@@ -91,10 +75,10 @@ func createClientRecRequest(userId int, quantity int, genreIds []int) ClientRecR
 	}
 }
 
-func getMoviesTitles() []string {
+func getMoviesTitles() MoviesTitles {
 	moviesTitles := MoviesTitles{}
 	LoadMoviesTitles(&moviesTitles)
-	return moviesTitles.Title
+	return moviesTitles
 }
 
 func moviesTitlesHandler(w http.ResponseWriter, r *http.Request) {
@@ -171,21 +155,31 @@ func MappRatingsClient(ratings []MovieRatingsClient, moviesTitles *MoviesTitles)
 	return arr
 }
 
-func sendRequestToRecommendationService(clientRecRequest ClientRecRequest) {
-	masterIp := "172.0.20.3"
-	masterPort := 9000
-	url := fmt.Sprintf("http://%s:%d/recommendation", masterIp, masterPort)
-	jsonValue, _ := json.Marshal(clientRecRequest)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonValue))
-	if err != nil {
-		log.Fatalf("Error al enviar la petición al servicio de recomendaciones: %v", err)
-	}
+func sendRequestToRecommendationService(clientRecRequest ClientRecRequest) syncutils.MasterRecResponse {
+    masterIp := "172.21.0.3"
+    masterPort := 9000
+    url := fmt.Sprintf("http://%s:%d/recommendation", masterIp, masterPort)
+    jsonValue, _ := json.Marshal(clientRecRequest)
+    resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonValue))
+    if err != nil {
+        log.Fatalf("Error al enviar la petición al servicio de recomendaciones: %v", err)
+    }
+    defer resp.Body.Close()
 
-	defer resp.Body.Close()
+    if resp.StatusCode != http.StatusOK {
+        log.Fatalf("Error en la respuesta del servicio de recomendaciones: %v", resp.Status)
+    }
+
+    var response syncutils.MasterRecResponse
+    err = json.NewDecoder(resp.Body).Decode(&response)
+    if err != nil {
+        log.Fatalf("Error al decodificar la respuesta del servicio de recomendaciones: %v", err)
+    }
+    return response
 }
 
 func sendRequestToRecommendationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
@@ -200,62 +194,17 @@ func sendRequestToRecommendationHandler(w http.ResponseWriter, r *http.Request) 
 	clientRecRequest := createClientRecRequest(clientToSend.UserId, clientToSend.Quantity, clientToSend.GenreIds)
 	clientRecRequest.Ratings = MappRatingsClient(clientToSend.MoviesRatings, &moviesTitles)
 
-	sendRequestToRecommendationService(clientRecRequest)
+	res:=sendRequestToRecommendationService(clientRecRequest)
 
 	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
 
 // obtner peliculas de un género
-func getMoviesByGenre(genre int) []MovieTitleWithID {
-	moviesTitles := MoviesTitles{}
-	LoadMoviesTitles(&moviesTitles)
-	moviesGenreIds := MoviesGenreIds{}
-	LoadMoviesGenreIds(&moviesGenreIds)
-	genres := Genres{}
-	LoadGenres(&genres)
-	var moviesGenres []MovieTitleWithID
-	for i := 0; i < len(moviesTitles.Title); i++ {
-		for _, genreId := range moviesGenreIds.MoviesGenreIds[i] {
-			if genreId == genre {
-				movie := MovieTitleWithID{
-					Title: moviesTitles.Title[i],
-					Id:    i,
-				}
-				moviesGenres = append(moviesGenres, movie)
-				break
-			}
-		}
-	}
-	return moviesGenres
-}
 
-func getMoviesByGenresHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-	//getID of genre from request
-	genre := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(genre)
-	if err != nil {
-		http.Error(w, "Error al convertir el id del género a entero", http.StatusBadRequest)
-		return
-	}
-	movies := getMoviesByGenre(id)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(movies)
-}
 
-func setupRoutes() {
-	http.HandleFunc("/movies/titles", moviesTitlesHandler)
-	http.HandleFunc("/genres", genresHandler)
-	http.HandleFunc("/movies/genres", MoviesGenresHandler)
-	http.HandleFunc("/recommendations", sendRequestToRecommendationHandler)
-	http.HandleFunc("/genres/movies", getMoviesByGenresHandler)
-	log.Println("Server running on port 9000")
-	log.Fatal(http.ListenAndServe(":9000", nil))
 
-}
+
 
 func main() {
 	Banner()

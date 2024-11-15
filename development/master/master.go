@@ -242,20 +242,6 @@ func (master *Master) loadConfig(filename string) error {
 	master.movieGenreNames = config.MovieGenreNames
 	master.movieGenreIds = config.MovieGenreIds
 	master.modelConfig = config.ModelConfig
-	/*
-	   log.Println("Slaves:", master.slaveIps)
-	   log.Println("Movies:", len(master.movieTitles))
-	   log.Println("Genres:", len(master.movieGenreNames))
-	   log.Println("MovieGenreIds:", len(master.movieGenreIds))
-	   log.Println("-ModelConfig-")
-	   log.Println("NumFeatures:", master.modelConfig.NumFeatures)
-	   log.Println("Epochs:", master.modelConfig.Epochs)
-	   log.Println("LearningRate:", master.modelConfig.LearningRate)
-	   log.Println("Regularization:", master.modelConfig.Regularization)
-	   log.Println("R:", len(master.modelConfig.R), "x", len(master.modelConfig.R[0]))
-	   log.Println("P:", len(master.modelConfig.P), "x", len(master.modelConfig.P[0]))
-	   log.Println("Q:", len(master.modelConfig.Q), "x", len(master.modelConfig.Q[0]))
-	*/
 	log.Println("INFO: Config loaded")
 	return nil
 }
@@ -274,6 +260,8 @@ func (master *Master) Init() error {
 }
 
 func (master *Master) Run() error {
+	Banner()
+
 	log.Println("INFO: Running")
 	defer log.Println("INFO: Stopped")
 
@@ -286,12 +274,19 @@ func (master *Master) Run() error {
 const handleServicePrefix = "handleService"
 
 func (master *Master) handleService() {
+
 	http.HandleFunc("/recommendation", master.serviceRecommendation)
 	serviceAdress := syncutils.JoinAddress(master.ip, syncutils.ServicePort)
+
+	http.HandleFunc("/movies/titles", moviesTitlesHandler)
+	http.HandleFunc("/genres", genresHandler)
+	http.HandleFunc("/movies/genres", MoviesGenresHandler)
+	http.HandleFunc("/genres/movies", getMoviesByGenresHandler)
+
 	log.Printf("INFO: %s: Service running on %s", handleServicePrefix, serviceAdress)
 	defer log.Printf("INFO: %s: Service stopped", handleServicePrefix)
 
-	if err := http.ListenAndServe(serviceAdress, nil); err != nil {
+	if err := http.ListenAndServe(serviceAdress,enableCORS(http.DefaultServeMux) ); err != nil {
 		log.Printf("ERROR: %s: Server initialization error: %v\n", handleServicePrefix, err)
 	}
 }
@@ -306,44 +301,6 @@ func (master *Master) serviceRecommendation(response http.ResponseWriter, reques
 	}
 }
 
-/*
-	func (master *Master) getRecommendation(response *http.ResponseWriter, request *http.Request) {
-		var requestBody syncutils.ClientRecRequest
-		err := json.NewDecoder(request.Body).Decode(&requestBody)
-		if err != nil {
-			http.Error(*response, "Invalid request payload", http.StatusBadRequest)
-			return
-		}
-		var recommendationResponse syncutils.MasterRecResponse
-		master.handleRecomendationRequest(requestBody.UserId, requestBody.Quantity, &recommendationResponse)
-		(*response).WriteHeader(http.StatusOK)
-		bytes, _ := json.MarshalIndent(recommendationResponse, "", "\t")
-		io.Writer.Write(*response, bytes)
-		log.Println("ENTREGADO")
-	}
-
-	func (master *Master) handleService() {
-		log.Println("INFO: Start service")
-		defer log.Println("INFO: End service")
-		serviceLstn, err := net.Listen("tcp", syncutils.JoinAddress(master.ip, syncutils.ServicePort))
-		if err != nil {
-			log.Println("ERROR: serviceError: Error setting service listener:", err)
-			return
-		}
-		defer serviceLstn.Close()
-
-		log.Printf("INFO: Service listening on %s:%d\n", master.ip, syncutils.ServicePort)
-		for {
-			conn, err := serviceLstn.Accept()
-			if err != nil {
-				log.Println("ERROR: serviceError: Error accepting connection:", err)
-			}
-			timeout := 20 * time.Second
-			conn.SetDeadline(time.Now().Add(timeout))
-			go master.handleRecommendation(&conn)
-		}
-	}
-*/
 const handleRecommendationPrefix = "handleRec"
 
 func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, apiRequest *http.Request) {
@@ -682,4 +639,82 @@ func FedAvg(gradients [][]float64, weights []float64) []float64 {
 	}
 
 	return avgGrad // Retorna el gradiente promedio para actualizar el modelo global
+}
+
+
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// allow all origins
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// allow all headers
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		// allow all methods
+		w.Header().Set("Access-Control-Allow-Methods", "*")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func Banner() {
+	fmt.Println("  ____                 _                            _             _   _             ")
+	fmt.Println(" |  _ \\ ___  __ _  ___| |_ ___  _ __ ___   ___  __| | __ _ _ __ | |_(_) ___  _ __  ")
+	fmt.Println(" | |_) / _ \\/ _` |/ __| __/ _ \\| '_ ` _ \\ / _ \\/ _` |/ _` | '_ \\| __| |/ _ \\| '_ \\ ")
+	fmt.Println(" |  _ <  __/ (_| | (__| || (_) | | | | | |  __/ (_| | (_| | | | | |_| | (_) | | | |")
+	fmt.Println(" |_| \\_\\___|\\__,_|\\___|\\__\\___/|_| |_| |_|\\___|\\__,_|\\__,_|_| |_|\\__|_|\\___/|_| |_|")
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println(" __          __  _                            _          __  __                                    ")
+	fmt.Println(" \\ \\        / / | |                          | |        |  \\/  |                                   ")
+	fmt.Println("  \\ \\  /\\  / /__| | ___ ___  _ __ ___   ___  | |_ ___   | \\  / | __ _ _ __   __ _  __ _  ___ _ __  ")
+	fmt.Println("   \\ \\/  \\/ / _ \\ |/ __/ _ \\| '_ ` _ \\ / _ \\ | __/ _ \\  | |\\/| |/ _` | '_ \\ / _` |/ _` |/ _ \\ '__| ")
+	fmt.Println("    \\  /\\  /  __/ | (_| (_) | | | | | |  __/ | || (_) | | |  | | (_| | | | | (_| | (_| |  __/ |    ")
+	fmt.Println("     \\/  \\/ \\___|_|\\___\\___/|_| |_| |_|\\___|  \\__\\___/  |_|  |_|\\__,_|_| |_|\\__,_|\\__, |\\___|_|    ")
+	fmt.Println("                                                                                     __/ |         ")
+	fmt.Println("                                                                                    |___/          ")
+	fmt.Println("--------------------------------------------------------------------------------")
+}
+
+
+func getMoviesByGenre(genre int) []MovieTitleWithID {
+	moviesTitles := MoviesTitles{}
+	LoadMoviesTitles(&moviesTitles)
+	moviesGenreIds := MoviesGenreIds{}
+	LoadMoviesGenreIds(&moviesGenreIds)
+	genres := Genres{}
+	LoadGenres(&genres)
+	var moviesGenres []MovieTitleWithID
+	for i := 0; i < len(moviesTitles.Title); i++ {
+		for _, genreId := range moviesGenreIds.MoviesGenreIds[i] {
+			if genreId == genre {
+				movie := MovieTitleWithID{
+					Title: moviesTitles.Title[i],
+					Id:    i,
+				}
+				moviesGenres = append(moviesGenres, movie)
+				break
+			}
+		}
+	}
+	return moviesGenres
+}
+
+func getMoviesByGenresHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+	//getID of genre from request
+	genre := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(genre)
+	if err != nil {
+		http.Error(w, "Error al convertir el id del género a entero", http.StatusBadRequest)
+		return
+	}
+	movies := getMoviesByGenre(id)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movies)
 }
