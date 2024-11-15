@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"recommendation-service/master/safecounts"
 	"recommendation-service/model"
 	"recommendation-service/syncutils"
 	"sort"
@@ -22,120 +23,15 @@ type Master struct {
 	movieGenreIds   [][]int
 	modelConfig     model.ModelConfig
 	slaveIps        []string
-	slavesInfo      SafeCounts
+	slavesInfo      safecounts.SafeCounts
 }
 
-// Considerar poner las información de las peliculas en una clase
 type MasterConfig struct {
 	SlaveIps        []string          `json:"slaveIps"`
 	MovieTitles     []string          `json:"movieTitles"`
 	MovieGenreNames []string          `json:"movieGenreNames"`
 	MovieGenreIds   [][]int           `json:"movieGenreIds"`
 	ModelConfig     model.ModelConfig `json:"modelConfig"`
-}
-
-type SafeCounts struct {
-	Counts   []int
-	CountsMu sync.RWMutex
-	Status   []bool
-	StatusMu sync.RWMutex
-}
-
-func (sd *SafeCounts) ReadCounts() []int {
-	sd.CountsMu.RLock()
-	defer sd.CountsMu.RUnlock()
-	copiedCounts := make([]int, len(sd.Counts))
-	copy(copiedCounts, sd.Counts)
-	return copiedCounts
-}
-
-func (sd *SafeCounts) CompareCounts(counts []int) bool {
-	sd.CountsMu.RLock()
-	defer sd.CountsMu.RUnlock()
-	for i, count := range counts {
-		if count != sd.Counts[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (sd *SafeCounts) ReadCountByIndex(index int) int {
-	sd.CountsMu.RLock()
-	defer sd.CountsMu.RUnlock()
-	return sd.Counts[index]
-}
-func (sd *SafeCounts) WriteCountByIndex(value int, index int) {
-	sd.CountsMu.Lock()
-	defer sd.CountsMu.Unlock()
-	sd.Counts[index] = value
-}
-func (sd *SafeCounts) ReadStatus() []bool {
-	sd.StatusMu.RLock()
-	defer sd.StatusMu.RUnlock()
-	copiedStatus := make([]bool, len(sd.Status))
-	copy(copiedStatus, sd.Status)
-	return copiedStatus
-}
-
-func (sd *SafeCounts) ReadStatustByIndex(index int) bool {
-	sd.StatusMu.RLock()
-	defer sd.StatusMu.RUnlock()
-	return sd.Status[index]
-}
-func (sd *SafeCounts) WriteStatusByIndex(value bool, index int) {
-	sd.StatusMu.Lock()
-	defer sd.StatusMu.Unlock()
-	sd.Status[index] = value
-}
-func (sd *SafeCounts) GetMinCountIdByStatus(status bool) int {
-	sd.CountsMu.RLock()
-	defer sd.CountsMu.RUnlock()
-	min := sd.Counts[0]
-	minIndex := -1
-	for i, count := range sd.Counts {
-		if (minIndex == -1 || count < min) && sd.Status[i] == status {
-			min = count
-			minIndex = i
-		}
-	}
-	return minIndex
-}
-
-func (sd *SafeCounts) GetActiveCountNum() int {
-	sd.StatusMu.RLock()
-	defer sd.StatusMu.RUnlock()
-	total := 0
-	for _, status := range sd.Status {
-		if status {
-			total++
-		}
-	}
-	return total
-}
-
-func (sd *SafeCounts) GetActiveCountNumByStatus(status bool) int {
-	sd.StatusMu.RLock()
-	defer sd.StatusMu.RUnlock()
-	total := 0
-	for _, iStatus := range sd.Status {
-		if iStatus == status {
-			total++
-		}
-	}
-	return total
-}
-
-func (sd *SafeCounts) GetActiveIdsByStatus(status bool) []int {
-	sd.StatusMu.RLock()
-	defer sd.StatusMu.RUnlock()
-	ids := make([]int, 0)
-	for i, iStatus := range sd.Status {
-		if iStatus == status {
-			ids = append(ids, i)
-		}
-	}
-	return ids
 }
 
 func (master *Master) handleSyncronization() {
@@ -236,7 +132,6 @@ func (master *Master) loadConfig(filename string) error {
 	if err != nil {
 		return fmt.Errorf("loadConfig: Error loading config file: %v", err)
 	}
-
 	master.slaveIps = config.SlaveIps
 	master.movieTitles = config.MovieTitles
 	master.movieGenreNames = config.MovieGenreNames
@@ -260,8 +155,6 @@ func (master *Master) Init() error {
 }
 
 func (master *Master) Run() error {
-	Banner()
-
 	log.Println("INFO: Running")
 	defer log.Println("INFO: Stopped")
 
@@ -274,19 +167,18 @@ func (master *Master) Run() error {
 const handleServicePrefix = "handleService"
 
 func (master *Master) handleService() {
+	http.HandleFunc("/recommendations", master.serviceRecommendation)
+	http.HandleFunc("/movies/titles", master.moviesTitlesHandler)
+	http.HandleFunc("/genres", master.genresHandler)
+	http.HandleFunc("/genres/movies", master.getMoviesByGenresHandler)
+	http.HandleFunc("/movies/genres", master.MoviesGenresHandler)
 
-	http.HandleFunc("/recommendation", master.serviceRecommendation)
 	serviceAdress := syncutils.JoinAddress(master.ip, syncutils.ServicePort)
-
-	http.HandleFunc("/movies/titles", moviesTitlesHandler)
-	http.HandleFunc("/genres", genresHandler)
-	http.HandleFunc("/movies/genres", MoviesGenresHandler)
-	http.HandleFunc("/genres/movies", getMoviesByGenresHandler)
 
 	log.Printf("INFO: %s: Service running on %s", handleServicePrefix, serviceAdress)
 	defer log.Printf("INFO: %s: Service stopped", handleServicePrefix)
 
-	if err := http.ListenAndServe(serviceAdress,enableCORS(http.DefaultServeMux) ); err != nil {
+	if err := http.ListenAndServe(serviceAdress, enableCORS(http.DefaultServeMux)); err != nil {
 		log.Printf("ERROR: %s: Server initialization error: %v\n", handleServicePrefix, err)
 	}
 }
@@ -308,15 +200,25 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 	log.Printf("INFO: %s: Handling recommendation\n", handleRecommendationPrefix)
 	defer log.Printf("INFO: %s: Recommendation handled\n", handleRecommendationPrefix)
 
-	var request syncutils.ClientRecRequest
+	var request ClientRecToSend
 	err := receiveRecommendationRequest(apiResponse, apiRequest, &request)
+
 	if err != nil {
 		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
 		return
 	}
 
+	clientRecRequest := syncutils.ClientRecRequest{
+		UserId:   request.UserId,
+		Quantity: request.Quantity,
+		GenreIds: request.GenreIds,
+	}
+	moviesTitle := MoviesTitles{Title: master.movieTitles}
+
+	clientRecRequest.Ratings = MappRatingsClient(request.MoviesRatings, &moviesTitle)
+
 	var response syncutils.MasterRecResponse
-	err = master.processRecommendationRequest(apiResponse, &response, &request)
+	err = master.processRecommendationRequest(apiResponse, &response, &clientRecRequest)
 	if err != nil {
 		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
 		return
@@ -330,7 +232,7 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 
 const receiveRecommendationRequestPrefix = "receiveRecRequest"
 
-func receiveRecommendationRequest(apiResponse *http.ResponseWriter, apiRequest *http.Request, request *syncutils.ClientRecRequest) error {
+func receiveRecommendationRequest(apiResponse *http.ResponseWriter, apiRequest *http.Request, request *ClientRecToSend) error {
 	err := json.NewDecoder(apiRequest.Body).Decode(request)
 	if err != nil {
 		http.Error(*apiResponse, "Invalid request payload", http.StatusBadRequest)
@@ -401,27 +303,6 @@ func respondRecommendationRequest(apiResponse *http.ResponseWriter, response *sy
 	(*apiResponse).WriteHeader(http.StatusOK)
 
 	return nil
-}
-
-func getComment(rating, max, min, mean float64) string {
-	highThreshold1 := mean + (max-mean)*0.90
-	highThreshold2 := mean + (max-mean)*0.60
-	lowThreshold1 := mean - (mean-min)*0.60
-	lowThreshold2 := mean - (mean-min)*0.90
-
-	if rating > highThreshold1 {
-		return "Altamente Recomendado. Muy por encima de la media"
-	} else if rating > highThreshold2 {
-		return "Recomendado. Bastante por encima de la media"
-	} else if rating > mean {
-		return "Ligeramente Recomendado. Por encima de la media"
-	} else if rating > lowThreshold1 {
-		return "Ligeramente No Recomendado. Justo por debajo de la media"
-	} else if rating > lowThreshold2 {
-		return "Poco Recomendado. Bastante por debajo de la media"
-	} else {
-		return "Muy Poco Recomendado. Muy por debajo de la media"
-	}
 }
 
 const handleModelRecommendationPrefix = "handleModelRec"
@@ -639,82 +520,4 @@ func FedAvg(gradients [][]float64, weights []float64) []float64 {
 	}
 
 	return avgGrad // Retorna el gradiente promedio para actualizar el modelo global
-}
-
-
-func enableCORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// allow all origins
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		// allow all headers
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		// allow all methods
-		w.Header().Set("Access-Control-Allow-Methods", "*")
-
-		// Handle preflight requests
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func Banner() {
-	fmt.Println("  ____                 _                            _             _   _             ")
-	fmt.Println(" |  _ \\ ___  __ _  ___| |_ ___  _ __ ___   ___  __| | __ _ _ __ | |_(_) ___  _ __  ")
-	fmt.Println(" | |_) / _ \\/ _` |/ __| __/ _ \\| '_ ` _ \\ / _ \\/ _` |/ _` | '_ \\| __| |/ _ \\| '_ \\ ")
-	fmt.Println(" |  _ <  __/ (_| | (__| || (_) | | | | | |  __/ (_| | (_| | | | | |_| | (_) | | | |")
-	fmt.Println(" |_| \\_\\___|\\__,_|\\___|\\__\\___/|_| |_| |_|\\___|\\__,_|\\__,_|_| |_|\\__|_|\\___/|_| |_|")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println(" __          __  _                            _          __  __                                    ")
-	fmt.Println(" \\ \\        / / | |                          | |        |  \\/  |                                   ")
-	fmt.Println("  \\ \\  /\\  / /__| | ___ ___  _ __ ___   ___  | |_ ___   | \\  / | __ _ _ __   __ _  __ _  ___ _ __  ")
-	fmt.Println("   \\ \\/  \\/ / _ \\ |/ __/ _ \\| '_ ` _ \\ / _ \\ | __/ _ \\  | |\\/| |/ _` | '_ \\ / _` |/ _` |/ _ \\ '__| ")
-	fmt.Println("    \\  /\\  /  __/ | (_| (_) | | | | | |  __/ | || (_) | | |  | | (_| | | | | (_| | (_| |  __/ |    ")
-	fmt.Println("     \\/  \\/ \\___|_|\\___\\___/|_| |_| |_|\\___|  \\__\\___/  |_|  |_|\\__,_|_| |_|\\__,_|\\__, |\\___|_|    ")
-	fmt.Println("                                                                                     __/ |         ")
-	fmt.Println("                                                                                    |___/          ")
-	fmt.Println("--------------------------------------------------------------------------------")
-}
-
-
-func getMoviesByGenre(genre int) []MovieTitleWithID {
-	moviesTitles := MoviesTitles{}
-	LoadMoviesTitles(&moviesTitles)
-	moviesGenreIds := MoviesGenreIds{}
-	LoadMoviesGenreIds(&moviesGenreIds)
-	genres := Genres{}
-	LoadGenres(&genres)
-	var moviesGenres []MovieTitleWithID
-	for i := 0; i < len(moviesTitles.Title); i++ {
-		for _, genreId := range moviesGenreIds.MoviesGenreIds[i] {
-			if genreId == genre {
-				movie := MovieTitleWithID{
-					Title: moviesTitles.Title[i],
-					Id:    i,
-				}
-				moviesGenres = append(moviesGenres, movie)
-				break
-			}
-		}
-	}
-	return moviesGenres
-}
-
-func getMoviesByGenresHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-	//getID of genre from request
-	genre := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(genre)
-	if err != nil {
-		http.Error(w, "Error al convertir el id del género a entero", http.StatusBadRequest)
-		return
-	}
-	movies := getMoviesByGenre(id)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(movies)
 }
