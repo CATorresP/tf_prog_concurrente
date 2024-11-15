@@ -9,9 +9,9 @@
 *.user
 *.userosscache
 *.sln.docstates
-AppRecomendation
 scripting
 requirements.txt
+assets
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
