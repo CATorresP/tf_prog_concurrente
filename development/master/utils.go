@@ -1,7 +1,5 @@
 package master
 
-import "fmt"
-
 func MappRatingsClient(ratings []MovieRatingsClient, moviesTitles *MoviesTitles) []float64 {
 	numMovies := len(moviesTitles.Title)
 	arr := make([]float64, numMovies)
@@ -9,24 +7,6 @@ func MappRatingsClient(ratings []MovieRatingsClient, moviesTitles *MoviesTitles)
 		arr[rating.MovieId] = float64(rating.Rating)
 	}
 	return arr
-}
-
-func Banner() {
-	fmt.Println("  ____                 _                            _             _   _             ")
-	fmt.Println(" |  _ \\ ___  __ _  ___| |_ ___  _ __ ___   ___  __| | __ _ _ __ | |_(_) ___  _ __  ")
-	fmt.Println(" | |_) / _ \\/ _` |/ __| __/ _ \\| '_ ` _ \\ / _ \\/ _` |/ _` | '_ \\| __| |/ _ \\| '_ \\ ")
-	fmt.Println(" |  _ <  __/ (_| | (__| || (_) | | | | | |  __/ (_| | (_| | | | | |_| | (_) | | | |")
-	fmt.Println(" |_| \\_\\___|\\__,_|\\___|\\__\\___/|_| |_| |_|\\___|\\__,_|\\__,_|_| |_|\\__|_|\\___/|_| |_|")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println(" __          __  _                            _          __  __                                    ")
-	fmt.Println(" \\ \\        / / | |                          | |        |  \\/  |                                   ")
-	fmt.Println("  \\ \\  /\\  / /__| | ___ ___  _ __ ___   ___  | |_ ___   | \\  / | __ _ _ __   __ _  __ _  ___ _ __  ")
-	fmt.Println("   \\ \\/  \\/ / _ \\ |/ __/ _ \\| '_ ` _ \\ / _ \\ | __/ _ \\  | |\\/| |/ _` | '_ \\ / _` |/ _` |/ _ \\ '__| ")
-	fmt.Println("    \\  /\\  /  __/ | (_| (_) | | | | | |  __/ | || (_) | | |  | | (_| | | | | (_| | (_| |  __/ |    ")
-	fmt.Println("     \\/  \\/ \\___|_|\\___\\___/|_| |_| |_|\\___|  \\__\\___/  |_|  |_|\\__,_|_| |_|\\__,_|\\__, |\\___|_|    ")
-	fmt.Println("                                                                                     __/ |         ")
-	fmt.Println("                                                                                    |___/          ")
-	fmt.Println("--------------------------------------------------------------------------------")
 }
 
 func (master *Master) getMoviesByGenre(genre int) []MovieTitleWithID {

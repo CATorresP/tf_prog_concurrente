@@ -146,7 +146,6 @@ func (master *Master) Init() error {
 	if err != nil {
 		return fmt.Errorf("initError: Error loading config: %v", err)
 	}
-	Banner()
 	numSlaves := len(master.slaveIps)
 	master.slavesInfo.Counts = make([]int, numSlaves)
 	master.slavesInfo.Status = make([]bool, numSlaves)
@@ -426,11 +425,11 @@ func initializeUserFactors(numFeatures int) []float64 {
 
 func (master *Master) handleService() {
 	utilwebsocket.HandleWsFunc[ClientRecToSend, syncutils.MasterRecResponse]("/recommendations", master.handleRecommendation)
+	utilwebsocket.HandleWsFunc[MoviesByGenderRequest, []MovieTitleWithID]("/genres/movies", master.getMoviesByGenresHandler)
+
 	utilwebsocket.HandleWsFuncNoRequest[MoviesTitles]("/movies/titles", master.moviesTitlesHandler)
 	utilwebsocket.HandleWsFuncNoRequest[Genres]("/genres", master.genresHandler)
 	utilwebsocket.HandleWsFuncNoRequest[[]MovieGenres]("/movies/genres", master.MoviesGenresHandler)
-
-	//utilwebsocket.HandleWsFuncNoRequest[[]MovieGenres]("/genres/movies", master.getMoviesByGenresHandler)
 
 	serviceAdress := syncutils.JoinAddress(master.ip, syncutils.ServicePort)
 	log.Printf("INFO: Service running on %s", serviceAdress)
