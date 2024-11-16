@@ -6,34 +6,16 @@ import (
 	"strconv"
 )
 
-func (master *Master) genresHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-	genres := Genres{Genresname: master.movieGenreNames}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(genres)
+func (master *Master) genresHandler(response *Genres) {
+	*response = Genres{Genresname: master.movieGenreNames}
 }
 
-func (master *Master) MoviesGenresHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-	genres := master.getMoviesGenres()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(genres)
+func (master *Master) MoviesGenresHandler(response *[]MovieGenres) {
+	*response = master.getMoviesGenres()
 }
 
-func (master *Master) moviesTitlesHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-	MoviesTitles := MoviesTitles{Title: master.movieTitles}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(MoviesTitles)
+func (master *Master) moviesTitlesHandler(response *MoviesTitles) {
+	*response = MoviesTitles{Title: master.movieTitles}
 }
 
 func (master *Master) getMoviesByGenresHandler(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"recommendation-service/master/safecounts"
+	"recommendation-service/master/utilwebsocket"
 	"recommendation-service/model"
 	"recommendation-service/syncutils"
 	"sort"
@@ -165,37 +166,9 @@ func (master *Master) Run() error {
 	return nil
 }
 
-const handleServicePrefix = "handleService"
-
-func (master *Master) handleService() {
-	http.HandleFunc("/recommendations", master.serviceRecommendation)
-	http.HandleFunc("/movies/titles", master.moviesTitlesHandler)
-	http.HandleFunc("/genres", master.genresHandler)
-	http.HandleFunc("/genres/movies", master.getMoviesByGenresHandler)
-	http.HandleFunc("/movies/genres", master.MoviesGenresHandler)
-
-	serviceAdress := syncutils.JoinAddress(master.ip, syncutils.ServicePort)
-
-	log.Printf("INFO: %s: Service running on %s", handleServicePrefix, serviceAdress)
-	defer log.Printf("INFO: %s: Service stopped", handleServicePrefix)
-
-	if err := http.ListenAndServe(serviceAdress, enableCORS(http.DefaultServeMux)); err != nil {
-		log.Printf("ERROR: %s: Server initialization error: %v\n", handleServicePrefix, err)
-	}
-}
-
-func (master *Master) serviceRecommendation(response http.ResponseWriter, request *http.Request) {
-	switch request.Method {
-	case http.MethodPost:
-		log.Println("POST/", request.URL.Path)
-		master.handleRecommendation(&response, request)
-	default:
-		http.Error(response, "Método no permitido", http.StatusMethodNotAllowed)
-	}
-}
-
 const handleRecommendationPrefix = "handleRec"
 
+// func (master *Master) handleRecommendation(request *typeRequest, response *typeResponse) error {
 func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, apiRequest *http.Request) {
 
 	log.Printf("INFO: %s: Handling recommendation\n", handleRecommendationPrefix)
@@ -219,7 +192,7 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 	clientRecRequest.Ratings = MappRatingsClient(request.MoviesRatings, &moviesTitle)
 
 	var response syncutils.MasterRecResponse
-	err = master.processRecommendationRequest(apiResponse, &response, &clientRecRequest)
+	err = master.processRecommendationRequest(&response, &clientRecRequest)
 	if err != nil {
 		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
 		return
@@ -244,7 +217,7 @@ func receiveRecommendationRequest(apiResponse *http.ResponseWriter, apiRequest *
 
 const processRecommendationRequestPrefix = "processRecRequest"
 
-func (master *Master) processRecommendationRequest(apiResponse *http.ResponseWriter, response *syncutils.MasterRecResponse, request *syncutils.ClientRecRequest) error {
+func (master *Master) processRecommendationRequest(response *syncutils.MasterRecResponse, request *syncutils.ClientRecRequest) error {
 	var predictions []syncutils.Prediction
 	var sum float64
 	var max float64
@@ -252,13 +225,11 @@ func (master *Master) processRecommendationRequest(apiResponse *http.ResponseWri
 	var count int
 
 	if len(request.Ratings) != len(master.modelConfig.Q) {
-		http.Error(*apiResponse, "Invalid request payload", http.StatusBadRequest)
 		return fmt.Errorf("%s: Incorrect ratings quantity", processRecommendationRequestPrefix)
 	}
 
 	err := master.handleModelRecommendation(&predictions, &sum, &max, &min, &count, request)
 	if err != nil {
-		http.Error(*apiResponse, "Internal server error", http.StatusInternalServerError)
 		return fmt.Errorf("%s: %v", processRecommendationRequestPrefix, err)
 	}
 
@@ -500,25 +471,20 @@ func initializeUserFactors(numFeatures int) []float64 {
 	return userFactors
 }
 
-func FedAvg(gradients [][]float64, weights []float64) []float64 {
-	numFeatures := len(gradients[0]) // Asumimos que todos los vectores tienen la misma longitud
+func (master *Master) handleService() {
+	utilwebsocket.HandleWsFunc[syncutils.MasterRecResponse, syncutils.ClientRecRequest]("/recommendations", master.processRecommendationRequest)
+	utilwebsocket.HandleWsFuncNoRequest[MoviesTitles]("/movies/titles", master.moviesTitlesHandler)
+	utilwebsocket.HandleWsFuncNoRequest[Genres]("/genres", master.genresHandler)
+	utilwebsocket.HandleWsFuncNoRequest[[]MovieGenres]("/movies/genres", master.MoviesGenresHandler)
 
-	avgGrad := make([]float64, numFeatures)
+	//utilwebsocket.HandleWsFuncNoRequest[[]MovieGenres]("/genres/movies", master.getMoviesByGenresHandler)
 
-	for i := 0; i < numFeatures; i++ {
-		for j, grad := range gradients {
-			avgGrad[i] += grad[i] * weights[j] // Pondera cada gradiente
-		}
+	serviceAdress := syncutils.JoinAddress(master.ip, syncutils.ServicePort)
+	log.Printf("INFO: Service running on %s", serviceAdress)
+	defer log.Printf("INFO: Service stopped")
+
+	err := http.ListenAndServe(serviceAdress, enableCORS(http.DefaultServeMux))
+	if err != nil {
+		log.Printf("ERROR: Server initialization error: %v\n", err)
 	}
-
-	sumWeights := 0.0
-	for _, w := range weights {
-		sumWeights += w
-	}
-
-	for i := range avgGrad {
-		avgGrad[i] /= sumWeights
-	}
-
-	return avgGrad // Retorna el gradiente promedio para actualizar el modelo global
 }
