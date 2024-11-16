@@ -147,6 +147,7 @@ func (master *Master) Init() error {
 	if err != nil {
 		return fmt.Errorf("initError: Error loading config: %v", err)
 	}
+	Banner()
 	numSlaves := len(master.slaveIps)
 	master.slavesInfo.Counts = make([]int, numSlaves)
 	master.slavesInfo.Status = make([]bool, numSlaves)

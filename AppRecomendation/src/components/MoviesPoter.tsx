@@ -24,7 +24,7 @@ export function MoviePoster({
         <div className="flex flex-col items-center justify-center bg-gray-800 p-2 rounded-lg">
           <img
             className="w-40 h-60 rounded-lg"
-            src={`./src/assets/${movieTitleId.id}.jpg`}
+            src={`assets/${movieTitleId.id}.jpg`}
             alt={movieTitleId.title}
             onError={() => setImageError(true)}
           />

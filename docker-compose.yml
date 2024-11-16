@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  web:
+    image: nginx:latest
+    container_name: web
+    volumes:
+      - ./AppRecomendation/dist:/usr/share/nginx/html
+    ports:
+      - 8080:80
+    restart: always
+    depends_on:
+      - master
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.2
+
+  master:
+    image: golang:latest
+    container_name: master
+    volumes:
+      - ./development/master:/go/src/app/master
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/config:/go/src/app/config
+      - ./development/server.go:/go/src/app/server.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command: go run server.go
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.3
+    ports:
+      - 9000:9000
+    depends_on:
+      - slave1
+      - slave2
+      - slave3
+
+  slave1:
+    image: golang:latest
+    container_name: slave1
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command: go run client.go
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.4
+  slave2:
+    image: golang:latest
+    container_name: slave2
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command: go run client.go
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.5
+  slave3:
+    image: golang:latest
+    container_name: slave3
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command: go run client.go
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.6
+
+networks:
+    distnet:
+        driver: bridge
+        ipam:
+            driver: default
+            config:
+                - subnet: 172.21.0.0/16
+
