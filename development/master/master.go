@@ -1,9 +1,7 @@
 package master
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
 	"net"
@@ -169,18 +167,9 @@ func (master *Master) Run() error {
 const handleRecommendationPrefix = "handleRec"
 
 // func (master *Master) handleRecommendation(request *typeRequest, response *typeResponse) error {
-func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, apiRequest *http.Request) {
-
+func (master *Master) handleRecommendation(request *ClientRecToSend, response *syncutils.MasterRecResponse) error {
 	log.Printf("INFO: %s: Handling recommendation\n", handleRecommendationPrefix)
 	defer log.Printf("INFO: %s: Recommendation handled\n", handleRecommendationPrefix)
-
-	var request ClientRecToSend
-	err := receiveRecommendationRequest(apiResponse, apiRequest, &request)
-
-	if err != nil {
-		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
-		return
-	}
 
 	clientRecRequest := syncutils.ClientRecRequest{
 		UserId:   request.UserId,
@@ -191,33 +180,16 @@ func (master *Master) handleRecommendation(apiResponse *http.ResponseWriter, api
 
 	clientRecRequest.Ratings = MappRatingsClient(request.MoviesRatings, &moviesTitle)
 
-	var response syncutils.MasterRecResponse
-	err = master.processRecommendationRequest(&response, &clientRecRequest)
+	err := master.processRecommendationRequest(&clientRecRequest, response)
 	if err != nil {
-		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
-		return
-	}
-	err = respondRecommendationRequest(apiResponse, &response)
-	if err != nil {
-		log.Printf("ERROR: %s: %v\n", handleRecommendationPrefix, err)
-		return
-	}
-}
-
-const receiveRecommendationRequestPrefix = "receiveRecRequest"
-
-func receiveRecommendationRequest(apiResponse *http.ResponseWriter, apiRequest *http.Request, request *ClientRecToSend) error {
-	err := json.NewDecoder(apiRequest.Body).Decode(request)
-	if err != nil {
-		http.Error(*apiResponse, "Invalid request payload", http.StatusBadRequest)
-		return fmt.Errorf("%s: Error decoding request: %v", receiveRecommendationRequestPrefix, err)
+		return fmt.Errorf("ERROR: %s: %v", handleRecommendationPrefix, err)
 	}
 	return nil
 }
 
 const processRecommendationRequestPrefix = "processRecRequest"
 
-func (master *Master) processRecommendationRequest(response *syncutils.MasterRecResponse, request *syncutils.ClientRecRequest) error {
+func (master *Master) processRecommendationRequest(request *syncutils.ClientRecRequest, response *syncutils.MasterRecResponse) error {
 	var predictions []syncutils.Prediction
 	var sum float64
 	var max float64
@@ -254,25 +226,6 @@ func (master *Master) processRecommendationRequest(response *syncutils.MasterRec
 		}
 		(*response).Recommendations[i].Comment = getComment(prediction.Rating, max, min, mean)
 	}
-
-	return nil
-}
-
-const respondRecommendationRequestPrefix = "respondRecRequest"
-
-func respondRecommendationRequest(apiResponse *http.ResponseWriter, response *syncutils.MasterRecResponse) error {
-	bytes, err := json.MarshalIndent(response, "", "    ")
-	if err != nil {
-		http.Error(*apiResponse, "Error marshalling response", http.StatusInternalServerError)
-		return fmt.Errorf("%s: Error marshalling response: %v", respondRecommendationRequestPrefix, err)
-	}
-	_, err = io.Writer.Write(*apiResponse, bytes)
-	if err != nil {
-		http.Error(*apiResponse, "Error writing response", http.StatusInternalServerError)
-		return fmt.Errorf("%s: Error writing response: %v", respondRecommendationRequestPrefix, err)
-	}
-	(*apiResponse).Header().Set("Content-Type", "application/json")
-	(*apiResponse).WriteHeader(http.StatusOK)
 
 	return nil
 }
@@ -472,7 +425,7 @@ func initializeUserFactors(numFeatures int) []float64 {
 }
 
 func (master *Master) handleService() {
-	utilwebsocket.HandleWsFunc[syncutils.MasterRecResponse, syncutils.ClientRecRequest]("/recommendations", master.processRecommendationRequest)
+	utilwebsocket.HandleWsFunc[ClientRecToSend, syncutils.MasterRecResponse]("/recommendations", master.handleRecommendation)
 	utilwebsocket.HandleWsFuncNoRequest[MoviesTitles]("/movies/titles", master.moviesTitlesHandler)
 	utilwebsocket.HandleWsFuncNoRequest[Genres]("/genres", master.genresHandler)
 	utilwebsocket.HandleWsFuncNoRequest[[]MovieGenres]("/movies/genres", master.MoviesGenresHandler)
