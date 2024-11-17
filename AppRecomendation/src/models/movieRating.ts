@@ -3,6 +3,10 @@ export interface MovieRating {
   rating: number;
 }
 
+export interface MovieId {
+  id: number;
+}
+
 export interface MovieRatings {
   moviesRatings: MovieRating[];
   userId: number;

@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  master:
+    build:
+      context: ./master
+      dockerfile: dockerfile
+    ports:
+      - "9000:9000"
+
+  client1:
+    build:
+      context: ./slave
+      dockerfile: dockerfile
+    ports:
+      - "9001:9001"
+
+  client2:
+    build:
+      context: ./slave
+      dockerfile: dockerfile
+    ports:
+      - "9002:9001"
+
+  client3:
+    build:
+      context: ./slave
+      dockerfile: dockerfile
+    ports:
+      - "9003:9001"
+
+  nginx:
+    build:
+      context: ./cliente
+      dockerfile: dockerfile
+    ports:
+      - "8080:80"

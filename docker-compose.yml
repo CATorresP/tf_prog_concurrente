@@ -26,7 +26,7 @@ services:
       - ./development/go.mod:/go/src/app/go.mod
       - ./development/model:/go/src/app/model
     working_dir: /go/src/app
-    command: go run server.go
+    command:  /bin/sh -c "go mod tidy && go run server.go"
     networks:
       distnet:
         ipv4_address: 172.21.0.3
@@ -47,7 +47,7 @@ services:
       - ./development/go.mod:/go/src/app/go.mod
       - ./development/model:/go/src/app/model
     working_dir: /go/src/app
-    command: go run client.go
+    command:  /bin/sh -c "go mod tidy && go run client.go"
     networks:
       distnet:
         ipv4_address: 172.21.0.4
@@ -61,7 +61,7 @@ services:
       - ./development/go.mod:/go/src/app/go.mod
       - ./development/model:/go/src/app/model
     working_dir: /go/src/app
-    command: go run client.go
+    command:  /bin/sh -c "go mod tidy && go run client.go"
     networks:
       distnet:
         ipv4_address: 172.21.0.5
@@ -75,7 +75,7 @@ services:
       - ./development/go.mod:/go/src/app/go.mod
       - ./development/model:/go/src/app/model
     working_dir: /go/src/app
-    command: go run client.go
+    command:  /bin/sh -c "go mod tidy && go run client.go"
     networks:
       distnet:
         ipv4_address: 172.21.0.6

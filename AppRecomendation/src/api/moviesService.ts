@@ -6,55 +6,77 @@ import {
   MovieRatings,
   Recommendations,
 } from "@/models";
+
 export class MoviesService {
   private url: string;
 
-  constructor() {
-    this.url = "http://localhost:9000";
+  constructor(url: string = "ws://localhost:9000") {
+    this.url = url;
+  }
+
+  private sendRequest<T>(
+    path: string,
+    data?: Record<string, unknown>
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(this.url + path);
+
+      ws.onopen = () => {
+        console.log("Sending data to server", JSON.stringify({ data }));
+        ws.send(JSON.stringify({ ...data }));
+      };
+
+      ws.onmessage = (event) => {
+        const response = JSON.parse(event.data.toString());
+        console.log("Received data from server", response);
+        if (response.error) {
+          reject(response.error);
+        } else {
+          resolve(response);
+        }
+
+        setTimeout(() => {
+          ws.close();
+        }, 5000); // Give 1 second before closing the connection
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error", error);
+        reject(error);
+        ws.close();
+      };
+
+      ws.onclose = () => {
+        console.log("Disconnected from server");
+      };
+    });
   }
 
   async getMovies(): Promise<MoviesTitles> {
-    const response = await fetch(`${this.url}/movies/titles`);
-    const movies = await response.json();
-    return movies;
+    return this.sendRequest<MoviesTitles>("/movies/titles");
   }
 
   async getGenres(): Promise<Genres> {
-    const response = await fetch(`${this.url}/genres`);
-    const genres = await response.json();
-    return genres;
+    return this.sendRequest<Genres>("/genres");
   }
 
   async getMoviesByGenre(): Promise<MovieGenres[]> {
-    const response = await fetch(`${this.url}/movies/genres`);
-    const moviesGenres = await response.json();
-    return moviesGenres;
+    return this.sendRequest<MovieGenres[]>("/movies/genres");
   }
 
   async getGenresMovies(genreId: number): Promise<MovieTitleId[]> {
-    const response = await fetch(`${this.url}/genres/movies?id=${genreId}`);
-    const movies = await response.json();
-    return movies;
+    return this.sendRequest<MovieTitleId[]>("/genres/movies", { id: genreId });
   }
 
   async getRecommendations(
     movieRatings: MovieRatings
   ): Promise<Recommendations> {
-    const response = await fetch(`${this.url}/recommendations`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(movieRatings),
+    const { moviesRatings, userId, quantity, genreIds } = movieRatings;
+    return this.sendRequest<Recommendations>("/recommendations", {
+      moviesRatings,
+      userId,
+      quantity,
+      genreIds,
     });
-
-    if (!response.ok) {
-      throw new Error(
-        `Error en la respuesta del servicio de recomendaciones: ${response.statusText}`
-      );
-    }
-
-    const recommendations: Recommendations = await response.json();
-    return recommendations;
   }
 }
