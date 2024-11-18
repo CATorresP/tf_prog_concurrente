@@ -136,7 +136,22 @@ func (master *Master) loadConfig(filename string) error {
 	master.movieGenreNames = config.MovieGenreNames
 	master.movieGenreIds = config.MovieGenreIds
 	master.modelConfig = config.ModelConfig
+	/*
+	 "numFeatures": 100,
+        "epochs": 500,
+        "learningRate": 0.001,
+        "regularization": 0.0001,
+        "R": [
+	*/
+
 	log.Println("INFO: Config loaded")
+	log.Printf("INFO: SlaveIps: %v\n", master.slaveIps)
+	log.Printf("INFO: numFeatures: %v\n", master.modelConfig.NumFeatures)
+	log.Printf("INFO: epochs: %v\n", master.modelConfig.Epochs)
+	log.Printf("INFO: learningRate: %v\n", master.modelConfig.LearningRate)
+	log.Printf("INFO: regularization: %v\n", master.modelConfig.Regularization)
+	log.Printf("INFO: R shape : %v ,%v\n", len(master.modelConfig.R), len(master.modelConfig.R[0]))
+
 	return nil
 }
 
@@ -157,6 +172,7 @@ func (master *Master) Run() error {
 	log.Println("INFO: Running")
 	defer log.Println("INFO: Stopped")
 
+
 	master.handleSyncronization()
 	master.handleService()
 
@@ -170,6 +186,9 @@ func (master *Master) handleRecommendation(request *ClientRecToSend, response *s
 	log.Printf("INFO: %s: Handling recommendation\n", handleRecommendationPrefix)
 	defer log.Printf("INFO: %s: Recommendation handled\n", handleRecommendationPrefix)
 
+	var init time.Time
+	init = time.Now()
+
 	clientRecRequest := syncutils.ClientRecRequest{
 		UserId:   request.UserId,
 		Quantity: request.Quantity,
@@ -180,6 +199,8 @@ func (master *Master) handleRecommendation(request *ClientRecToSend, response *s
 	clientRecRequest.Ratings = MappRatingsClient(request.MoviesRatings, &moviesTitle)
 
 	err := master.processRecommendationRequest(&clientRecRequest, response)
+
+	log.Printf("INFO: %s: Recommendation time: %v\n", handleRecommendationPrefix, time.Since(init))
 	if err != nil {
 		return fmt.Errorf("ERROR: %s: %v", handleRecommendationPrefix, err)
 	}

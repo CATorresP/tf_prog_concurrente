@@ -37,7 +37,7 @@ export class MoviesService {
 
         setTimeout(() => {
           ws.close();
-        }, 5000); // Give 1 second before closing the connection
+        }, 120000);
       };
 
       ws.onerror = (error) => {

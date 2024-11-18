@@ -79,6 +79,64 @@ services:
     networks:
       distnet:
         ipv4_address: 172.21.0.6
+  slave4:
+    image: golang:latest
+    container_name: slave4
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command:  /bin/sh -c "go mod tidy && go run client.go"
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.7
+  slave5:
+    image: golang:latest
+    container_name: slave5
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command:  /bin/sh -c "go mod tidy && go run client.go"
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.8
+  slave6:
+    image: golang:latest
+    container_name: slave6
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command:  /bin/sh -c "go mod tidy && go run client.go"
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.9
+  slave7:
+    image: golang:latest
+    container_name: slave7
+    volumes:
+      - ./development/slave:/go/src/app/slave
+      - ./development/syncutils:/go/src/app/syncutils
+      - ./development/client.go:/go/src/app/client.go
+      - ./development/go.mod:/go/src/app/go.mod
+      - ./development/model:/go/src/app/model
+    working_dir: /go/src/app
+    command:  /bin/sh -c "go mod tidy && go run client.go"
+    networks:
+      distnet:
+        ipv4_address: 172.21.0.10
+
+
 
 networks:
     distnet:
