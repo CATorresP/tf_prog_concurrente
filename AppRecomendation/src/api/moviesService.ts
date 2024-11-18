@@ -37,7 +37,7 @@ export class MoviesService {
 
         setTimeout(() => {
           ws.close();
-        }, 120000);
+        }, 600000);
       };
 
       ws.onerror = (error) => {

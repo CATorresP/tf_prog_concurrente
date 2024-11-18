@@ -79,7 +79,6 @@ export const MoviesProvider = ({ children }: MoviesContextProviderProps) => {
     const recommendations = await moviesService.getRecommendations(
       movieRatings
     );
-    console.log(recommendations);
     setRecommendations(recommendations);
   };
 
